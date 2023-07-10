@@ -10,6 +10,8 @@ collisionCanvas.height = window.innerHeight;
 
 let score = 0;
 ctx.font = '50px Impact';
+let gameOver = false;
+
 
 let timeToNextRaven = 0;
 let ravenInterval = 500;
@@ -55,6 +57,7 @@ class Raven {
             else this.frame++;
             this.timeSinceFlap = 0;
         }
+        if (this.x < 0 - this.width) gameOver = true;
     }
 
     draw() {
@@ -78,7 +81,7 @@ class Explosion{
         this.sound = new Audio();
         this.sound.src = 'assets/sound/hit.wav';
         this.timeSinceLastFrame = 0;
-        this.frameInterval = 200;
+        this.frameInterval = 100 ;
         this.markedForDeletion = false;
     }    
     update(deltaTime) {
@@ -86,11 +89,12 @@ class Explosion{
         this.timeSinceLastFrame += deltaTime;
         if (this.timeSinceLastFrame > this.frameInterval) {
             this.frame++;
+            this.timeSinceLastFrame = 0;
             if (this.frame > 5) this.markedForDeletion = true;
         }
     }
     draw() {
-        ctx.drawImage(this.image, this.frame * this.spriteWidth, 0, this.spriteWidth, this.spriteHeight, this.x, this.y, this.size, this.size);
+        ctx.drawImage(this.image, this.frame * this.spriteWidth, 0, this.spriteWidth, this.spriteHeight, this.x, this.y-this.size/4, this.size, this.size);
     
     }
 }
@@ -100,6 +104,14 @@ function drawScore() {
     ctx.fillText('Score: ' + score, 50, 75);
     ctx.fillStyle = 'snow';
     ctx.fillText('Score: ' + score, 55, 80);
+}
+
+function drawGameOver() {
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'white';
+    ctx.fillText('GAME OVER, Your Score is ' + score, canvas.width/2, canvas.height/2);
+    ctx.fillStyle = 'gray';
+    ctx.fillText('GAME OVER, Your Score is ' + score, canvas.width/2+5, canvas.height/2+5);
 }
 
 window.addEventListener('click', function (e) {
@@ -136,7 +148,8 @@ function animate(timestamp) {
     [...ravens, ...explosions].forEach(object => object.draw());
     ravens = ravens.filter( raven => !raven.markedForDeletion)
     explosions = explosions.filter( ex => !ex.markedForDeletion)
-    requestAnimationFrame(animate);
+    if (!gameOver) requestAnimationFrame(animate);
+    else drawGameOver()
 }
 
 animate(0)
