@@ -3,6 +3,14 @@ const ctx = canvas.getContext('2d');
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
+const collisionCanvas = document.getElementById('collisionCanvas');
+const collisionCtx = collisionCanvas.getContext('2d');
+collisionCanvas.width = window.innerWidth;
+collisionCanvas.height = window.innerHeight;
+
+let score = 0;
+ctx.font = '50px Impact';
+
 let timeToNextRaven = 0;
 let ravenInterval = 500;
 let lastTime = 0;
@@ -27,10 +35,16 @@ class Raven {
         this.frame = 0;
         this.maxFrame = 4;
         this.timeSinceFlap = 0;
-        this.flapInterval = Math.random() *50 +50;
+        this.flapInterval = Math.random() * 50 + 50;
+        this.randomColor = [~~(Math.random() * 255), ~~(Math.random() * 255), ~~(Math.random() * 255)]; 
+        this.color = 'rgb(' + this.randomColor[0] + ',' + this.randomColor[1] + ',' + this.randomColor[2] + ')';
     }
 
     update(deltaTime) {
+        if (this.y < 0 || this.y > canvas.height - this.height) {
+            this.directionY = this.directionY * -1;
+        }
+        
         this.x -= this.directionX;
         this.y += this.directionY;
         if (this.x < 0 - this.width) this.markedForDeletion = true;
@@ -44,15 +58,67 @@ class Raven {
     }
 
     draw() {
-        ctx.strokeRect(this.x, this.y, this.width, this.height);
+        collisionCtx.fillStyle = this.color;
+        collisionCtx.fillRect(this.x, this.y, this.width, this.height);
         ctx.drawImage(this.image, this.frame * this.spriteWidth , 0, this.spriteWidth, this.spriteHeight,   this.x, this.y, this.width, this.height);
     }
 }
 
-const raven = new Raven();
+let explosions = [];
+class Explosion{
+    constructor(x, y, size) {
+        this.image = new Image();
+        this.image.src = 'assets/img/boom.png';
+        this.spriteWidth = 200;
+        this.spriteHeight = 179;
+        this.size = size;
+        this.x = x;
+        this.y = y;
+        this.frame = 0;
+        this.sound = new Audio();
+        this.sound.src = 'assets/sound/hit.wav';
+        this.timeSinceLastFrame = 0;
+        this.frameInterval = 200;
+        this.markedForDeletion = false;
+    }    
+    update(deltaTime) {
+        if(this.frame===0) this.sound.play();
+        this.timeSinceLastFrame += deltaTime;
+        if (this.timeSinceLastFrame > this.frameInterval) {
+            this.frame++;
+            if (this.frame > 5) this.markedForDeletion = true;
+        }
+    }
+    draw() {
+        ctx.drawImage(this.image, this.frame * this.spriteWidth, 0, this.spriteWidth, this.spriteHeight, this.x, this.y, this.size, this.size);
+    
+    }
+}
+
+function drawScore() {
+    ctx.fillStyle = 'black';
+    ctx.fillText('Score: ' + score, 50, 75);
+    ctx.fillStyle = 'snow';
+    ctx.fillText('Score: ' + score, 55, 80);
+}
+
+window.addEventListener('click', function (e) {
+    const detectPixelColor = collisionCtx.getImageData(e.x, e.y, 1, 1);
+    const pc = detectPixelColor.data;
+    ravens.forEach(raven => {
+        if (raven.randomColor[0] === pc[0] && raven.randomColor[1] === pc[1] && raven.randomColor[2] === pc[2]) {
+            raven.markedForDeletion = true;
+            score++;
+            explosions.push(new Explosion(raven.x, raven.y, raven.width))
+        }
+    })
+
+})
+
 
 function animate(timestamp) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    collisionCtx.clearRect(0, 0, canvas.width, canvas.height);
 
     let deltaTime = timestamp - lastTime;
     lastTime = timestamp;
@@ -61,10 +127,15 @@ function animate(timestamp) {
     if (timeToNextRaven > ravenInterval) {
         ravens.push(new Raven());
         timeToNextRaven = 0;
+        ravens.sort(function (a, b) {
+            return a.width - b.width;
+        });
     }
-    [...ravens].forEach(raven => raven.update(deltaTime));
-    [...ravens].forEach(raven => raven.draw());
+    drawScore();
+    [...ravens, ...explosions].forEach(object => object.update(deltaTime));
+    [...ravens, ...explosions].forEach(object => object.draw());
     ravens = ravens.filter( raven => !raven.markedForDeletion)
+    explosions = explosions.filter( ex => !ex.markedForDeletion)
     requestAnimationFrame(animate);
 }
 
